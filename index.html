@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Galactic Gauntlet</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #gameCanvas {
+            display: none;
+        }
+
+        #gameDiv, #leaderboard {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        #gameDiv label {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        #gameDiv input {
+            padding: 5px;
+            font-size: 18px;
+        }
+
+        #gameDiv button {
+            padding: 8px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            outline: none;
+        }
+
+        #gameDiv button:hover {
+            background-color: #45a049;
+        }
+
+        #leaderboard {
+            display: none;
+        }
+
+        #leaderboard h2 {
+            font-size: 30px;
+        }
+
+        #leaderboardList {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+
+        #leaderboardList li {
+            font-size: 18px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="gameDiv">
+    <label for="nickname">Nickname:</label>
+    <input type="text" id="nickname" />
+    <button onclick="startGame()">Start</button>
+</div>
+<div id="leaderboard">
+    <h2>Leaderboard</h2>
+    <ul id="leaderboardList"></ul>
+</div>
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const spaceshipWidth = 50;
+    const spaceshipHeight = 50;
+    const spaceshipSpeed = 5;
+
+    const bulletWidth = 5;
+    const bulletHeight = 15;
+    const bulletSpeed = 10;
+
+    const enemyWidth = 40;
+    const enemyHeight = 40;
+    const enemySpeed = 2;
+
+    const playerLives = 3;
+
+    let spaceshipX = canvas.width / 2 - spaceshipWidth / 2;
+    let spaceshipY = canvas.height - spaceshipHeight - 10;
+
+    let leftKeyPressed = false;
+    let rightKeyPressed = false;
+    let spaceKeyPressed = false;
+
+    let bullets = [];
+    let enemies = [];
+    let playerHP = 3;
+    let score = 0;
+    let bossInterval = 150;
+    let bossCounter = 0;
+
+    // Load images
+    const spaceshipImage = new Image();
+    spaceshipImage.src = "spaceship.png";
+
+    const enemyImage = new Image();
+    enemyImage.src = "enemy.png";
+
+    function getRandomHP(min, max) {
+        return Math.floor(Math.random() * (max - min + 1) + min);
+    }
+
+    function spawnEnemy() {
+        const enemyX = Math.random() * (canvas.width - enemyWidth);
+        const enemyY = -enemyHeight;
+        const enemyHP = getRandomHP(200, 1000);
+        enemies.push({ x: enemyX, y: enemyY, hp: enemyHP });
+    }
+
+    function updateSpaceship() {
+        if (leftKeyPressed && spaceshipX > 0) {
+            spaceshipX -= spaceshipSpeed;
+        }
+        if (rightKeyPressed && spaceshipX < canvas.width - spaceshipWidth) {
+            spaceshipX += spaceshipSpeed;
+        }
+
+        if (spaceKeyPressed) {
+            bullets.push({
+                x: spaceshipX + spaceshipWidth / 2 - bulletWidth / 2,
+                y: spaceshipY - bulletHeight,
+            });
+        }
+    }
+
+    function updateBullets() {
+        bullets.forEach((bullet, index) => {
+            bullet.y -= bulletSpeed;
+            if (bullet.y < 0) {
+                bullets.splice(index, 1);
+            }
+        });
+    }
+
+    function updateEnemies() {
+        enemies.forEach((enemy, index) => {
+            enemy.y += enemySpeed;
+            if (enemy.y > canvas.height) {
+                // Remove enemy if it goes below the canvas
+                enemies.splice(index, 1);
+
+                // Reduce player HP if enemy reaches bottom
+                playerHP--;
+            }
+        });
+
+        bossCounter++;
+        if (bossCounter >= bossInterval) {
+            bossCounter = 0;
+            spawnEnemy();
+        }
+    }
+
+    function handleCollisions() {
+        bullets.forEach((bullet, bulletIndex) => {
+            enemies.forEach((enemy, enemyIndex) => {
+                if (
+                    bullet.x < enemy.x + enemyWidth &&
+                    bullet.x + bulletWidth > enemy.x &&
+                    bullet.y < enemy.y + enemyHeight &&
+                    bullet.y + bulletHeight > enemy.y
+                ) {
+                    bullets.splice(bulletIndex, 1);
+
+                    // Reduce enemy HP
+                    enemy.hp -= 20;
+
+                    if (enemy.hp <= 0) {
+                        // Increase score and remove enemy if its HP goes below 0
+                        score += 10;
+                        enemies.splice(enemyIndex, 1);
+                    }
+                }
+            });
+        });
+
+        enemies.forEach((enemy, index) => {
+            if (
+                spaceshipX < enemy.x + enemyWidth &&
+                spaceshipX + spaceshipWidth > enemy.x &&
+                spaceshipY < enemy.y + enemyHeight &&
+                spaceshipY + spaceshipHeight > enemy.y
+            ) {
+                // Reduce player HP and remove enemy if it collides with the player
+                playerHP--;
+                enemies.splice(index, 1);
+            }
+        });
+
+        if (playerHP <= 0) {
+            // Player loses if HP is zero or negative
+            gameOver();
+        }
+    }
+
+    function drawSpaceship() {
+        ctx.drawImage(spaceshipImage, spaceshipX, spaceshipY, spaceshipWidth, spaceshipHeight);
+    }
+
+    function drawBullets() {
+        ctx.fillStyle = "yellow";
+        bullets.forEach((bullet) => {
+            ctx.fillRect(bullet.x, bullet.y, bulletWidth, bulletHeight);
+        });
+    }
+
+    function drawEnemies() {
+        enemies.forEach((enemy) => {
+            ctx.drawImage(enemyImage, enemy.x, enemy.y, enemyWidth, enemyHeight);
+        });
+    }
+
+    function drawPlayerHP() {
+        ctx.fillStyle = "white";
+        ctx.font = "24px Arial";
+        ctx.fillText("Player HP: " + playerHP, 10, 30);
+    }
+
+    function drawScore() {
+        ctx.fillStyle = "white";
+        ctx.font = "24px Arial";
+        ctx.fillText("Score: " + score, 10, 60);
+    }
+
+    function drawBackground() {
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function gameOver() {
+        ctx.fillStyle = "red";
+        ctx.font = "50px Arial";
+        ctx.fillText("Game Over", canvas.width / 2 - 150, canvas.height / 2);
+
+        // Salva il punteggio nella leaderboard
+        const nickname = nicknameInput.value.trim();
+        if (nickname !== "") {
+            leaderboardData.push({ nickname: nickname, score: score });
+            leaderboardData.sort((a, b) => b.score - a.score);
+
+            // Visualizza i primi 5 punteggi nella leaderboard
+            leaderboardList.innerHTML = "";
+            for (let i = 0; i < 5 && i < leaderboardData.length; i++) {
+                const item = document.createElement("li");
+                item.textContent = `${leaderboardData[i].nickname}: ${leaderboardData[i].score}`;
+                leaderboardList.appendChild(item);
+            }
+        }
+    }
+
+    document.addEventListener("keydown", (event) => {
+        if (event.keyCode === 37) {
+            leftKeyPressed = true;
+        } else if (event.keyCode === 39) {
+            rightKeyPressed = true;
+        } else if (event.keyCode === 32) {
+            spaceKeyPressed = true;
+        }
+    });
+
+    document.addEventListener("keyup", (event) => {
+        if (event.keyCode === 37) {
+            leftKeyPressed = false;
+        } else if (event.keyCode === 39) {
+            rightKeyPressed = false;
+        } else if (event.keyCode === 32) {
+            spaceKeyPressed = false;
+        }
+    });
+
+    let nicknameInput = document.getElementById("nickname");
+    let leaderboardList = document.getElementById("leaderboardList");
+    let gameDiv = document.getElementById("gameDiv");
+    let leaderboardDiv = document.getElementById("leaderboard");
+    let leaderboardData = [];
+
+    function gameLoop() {
+        drawBackground();
+        updateSpaceship();
+        updateBullets();
+        updateEnemies();
+        handleCollisions();
+        drawSpaceship();
+        drawBullets();
+        drawEnemies();
+        drawPlayerHP();
+        drawScore();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+        const nickname = nicknameInput.value.trim();
+        if (nickname !== "") {
+            // Nascondi il div del gioco e mostra la leaderboard
+            gameDiv.style.display = "none";
+            leaderboardDiv.style.display = "block";
+
+            // Avvia il gioco
+            gameLoop();
+        }
+    }
+
+    // Aggiungi stili CSS al canvas
+    canvas.style.border = "1px solid #ddd";
+    canvas.style.display = "block";
+</script>
+</body>
+</html>
